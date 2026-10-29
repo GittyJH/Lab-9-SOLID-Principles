@@ -17,10 +17,20 @@
  */
 package edu.arizona.ece373.lab09.challenge.example0.solution;
 
+/**
+ * The original code violated the Dependency Inversion Principle because the
+ * Order class directly instantiated a concrete Database object using the new
+ * keyword. The refactor introduced an interface and constructor injection, meaning
+ * the concrete database implementation could not be changed before without modifying
+ * source code, but can now be swapped freely for testing or alternative storage.
+ *
+ * Completion of DIP change. Updated Main to instantiate the concrete database and wire it into the Order object
+ */
 class Client {
     public class Main {
         public static void main(String[] args) {
-            Order order = new Order();
+            OrderRepository db = new Database();
+            Order order = new Order(db);
             order.processOrder("Laptop, Quantity: 1");
         }
     }
