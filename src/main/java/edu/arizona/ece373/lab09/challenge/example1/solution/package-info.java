@@ -17,8 +17,6 @@
  */
 package edu.arizona.ece373.lab09.challenge.example1.solution;
 
-package edu.arizona.ece373.lab09.challenge.example1.solution;
-
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpRequest;
 import com.google.api.client.http.HttpRequestFactory;
@@ -56,5 +54,35 @@ class PositionStackGeoCoder implements GeoCoder {
         float longitude = jsonObject.getJSONArray("data").getJSONObject(0).getFloat("longitude");
 
         return new Coordinates(latitude, longitude);
+    }
+}
+
+/**
+ * SRP & ISP change: Extracted the Open-Meteo HTTP request and raw JSON parsing into its own dedicated weather fetcher
+ * service. This isolates third-party API communication from prediction business logic.
+ */
+interface WeatherFetcher {
+    DailyForecast fetchForecast(float latitude, float longitude) throws IOException;
+
+    record DailyForecast(JSONArray times, JSONArray weatherCodes, JSONArray windSpeeds) {}
+}
+
+class OpenMeteoWeatherFetcher implements WeatherFetcher {
+    @Override
+    public DailyForecast fetchForecast(float latitude, float longitude) throws IOException {
+        HttpRequestFactory requestFactory = new NetHttpTransport().createRequestFactory();
+        HttpRequest request = requestFactory.buildGetRequest(
+                new GenericUrl("https://api.open-meteo.com/v1/forecast?latitude=" + latitude
+                        + "&longitude=" + longitude
+                        + "&daily=weathercode,windspeed_10m_max&current_weather=true&timezone=America%2FPhoenix"));
+
+        String rawResponse = request.execute().parseAsString();
+        JSONObject results = new JSONObject(rawResponse).getJSONObject("daily");
+
+        return new DailyForecast(
+                results.getJSONArray("time"),
+                results.getJSONArray("weathercode"),
+                results.getJSONArray("windspeed_10m_max")
+        );
     }
 }
