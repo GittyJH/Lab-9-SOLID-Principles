@@ -33,7 +33,11 @@ interface OrderRepository {
     void saveOrder(String orderDetails);
 }
 
-class Database {
+/**
+ * Continuation of DIP change. Low-level Database class now tied to OrderRepository interface.
+ */
+class Database implements OrderRepository {
+    @Override
     public void saveOrder(String orderDetails) {
         System.out.println("Saving to real database: " + orderDetails);
     }
