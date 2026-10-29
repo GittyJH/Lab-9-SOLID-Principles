@@ -43,8 +43,15 @@ class Database implements OrderRepository {
     }
 }
 
+/**
+ * Continued DIP change. Removed the Database() instantiation and injected the OrderRepository abstraction.
+ */
 class Order {
-    private Database db = new Database();
+    private final OrderRepository db;
+
+    public Order(OrderRepository db) {
+        this.db = db;
+    }
 
     public void processOrder(String orderDetails) {
         System.out.println("Processing order: " + orderDetails);
