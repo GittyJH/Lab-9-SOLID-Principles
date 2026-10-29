@@ -131,3 +131,64 @@ class WmoWeatherTranslator implements WeatherTranslator {
         return TRANSLATION.get(weatherCode);
     }
 }
+
+/**
+ * The original violation was a monolithic God class that coupled HTTP transport, JSON parsing,
+ * coordinate lookup, weather retrieval, and date filtering all within a single predict method.
+ * I know this violates the Single Responsibility Principle because changing the third-party API
+ * or adding unit tests required mocking network transports and JSON parsing directly inside the prediction logic.
+ * The refactor extracted these concerns into discrete, decoupled service interfaces (GeoCoder, WeatherFetcher,
+ * and WeatherTranslator). Specifically, before the refactor, you could not swap out
+ * the PositionStack API or Open-Meteo backend without rewriting the core prediction method; now, you can
+ * substitute any implementation of GeoCoder or WeatherFetcher without changing a single line of the core
+ * forecasting workflow.
+ */
+class Forecast {
+    private final GeoCoder geoCoder;
+    private final WeatherFetcher weatherFetcher;
+    private final WeatherTranslator weatherTranslator;
+
+    // Default constructor preserving the original instantiation behavior
+    public Forecast() {
+        this.geoCoder = new PositionStackGeoCoder();
+        this.weatherFetcher = new OpenMeteoWeatherFetcher();
+        this.weatherTranslator = new WmoWeatherTranslator();
+    }
+
+    // Constructor injection for high testability and loose coupling (DIP)
+    public Forecast(GeoCoder geoCoder, WeatherFetcher weatherFetcher, WeatherTranslator weatherTranslator) {
+        this.geoCoder = geoCoder;
+        this.weatherFetcher = weatherFetcher;
+        this.weatherTranslator = weatherTranslator;
+    }
+
+    public String predict(String city, LocalDate datetime, boolean wind) throws IOException {
+        // When date is not provided we look for the current prediction
+        if (datetime == null) {
+            datetime = LocalDate.now();
+        }
+        String format = datetime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+        // If there are predictions within the valid range
+        if (datetime.isBefore(LocalDate.now().plusDays(7))) {
+            GeoCoder.Coordinates coords = geoCoder.getCoordinates(city);
+
+            WeatherFetcher.DailyForecast results = weatherFetcher.fetchForecast(coords.latitude(), coords.longitude());
+
+            JSONArray times = results.times();
+            for (int i = 0; i < times.length(); i++) {
+                // When the date matches the expected date
+                if (format.equals(times.get(i))) {
+                    // If we have to return the wind information
+                    if (wind) {
+                        return String.valueOf(results.windSpeeds().getFloat(i));
+                    } else {
+                        int weatherCode = results.weatherCodes().getInt(i);
+                        return weatherTranslator.translate(weatherCode);
+                    }
+                }
+            }
+        }
+        return "";
+    }
+}
